@@ -71,7 +71,7 @@ In the project directory, you can run:
 * `npm run preview`: Serves the production build locally for preview.
 
 ## Project Structure (Example)
-
+```
 /
 ├── public/          # Static assets (e.g., favicon)
 ├── src/
@@ -90,7 +90,7 @@ In the project directory, you can run:
 ├── tailwind.config.js # Tailwind CSS configuration
 ├── tsconfig.json    # TypeScript configuration
 └── README.md        # This file
-
+```
 
 
 

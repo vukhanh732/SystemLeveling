@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { FaPlus, FaFilter, FaCheck, FaHourglass, FaClock } from 'react-icons/fa';
-import { useTaskStore, useThemeStore } from '../store';
+// Import useAuthStore
+import { useTaskStore, useThemeStore, useAuthStore } from '../store';
 import Layout from '../components/Layout';
 import TaskCard from '../components/TaskCard';
 import TaskForm from '../components/TaskForm';
@@ -9,7 +10,10 @@ import type { Task } from '../types';
 type TaskFilter = 'all' | 'pending' | 'completed' | 'expired';
 
 const TasksPage = () => {
-  const { tasks, getPendingTasks, getCompletedTasks, getExpiredTasks } = useTaskStore();
+  // Get user from auth store
+  const { user } = useAuthStore();
+  // Destructure selectors and the base tasks array (though we'll prefer selectors)
+  const { tasks, getPendingTasks, getCompletedTasks, getExpiredTasks, getTasksByUserId } = useTaskStore();
   const { theme } = useThemeStore();
 
   const [filter, setFilter] = useState<TaskFilter>('all');
@@ -18,37 +22,47 @@ const TasksPage = () => {
   const [filteredTasks, setFilteredTasks] = useState<Task[]>([]);
 
   useEffect(() => {
-    // Apply filters
+    // Only filter tasks if user.id exists
+    if (!user?.id) {
+        setFilteredTasks([]); // Clear tasks if no user
+        return;
+    }
+
+    console.log(`TasksPage: Filtering tasks with filter '${filter}' for user:`, user.id);
+    // Apply filters using user.id
+    let tasksToDisplay: Task[] = [];
     switch (filter) {
       case 'pending':
-        setFilteredTasks(getPendingTasks());
+        // --- FIX: Pass user.id ---
+        tasksToDisplay = getPendingTasks(user.id);
         break;
       case 'completed':
-        setFilteredTasks(getCompletedTasks());
+        // --- FIX: Pass user.id ---
+        tasksToDisplay = getCompletedTasks(user.id);
         break;
       case 'expired':
-        setFilteredTasks(getExpiredTasks());
+        // --- FIX: Pass user.id ---
+        tasksToDisplay = getExpiredTasks(user.id);
         break;
       case 'all':
       default:
-        setFilteredTasks(tasks);
+        // --- FIX: Use selector with user.id for 'all' filter ---
+        tasksToDisplay = getTasksByUserId(user.id); // Get all tasks specifically for this user
         break;
     }
-  }, [filter, tasks, getPendingTasks, getCompletedTasks, getExpiredTasks]);
+    setFilteredTasks(tasksToDisplay);
+
+    // Add user?.id to dependency array
+  }, [filter, user?.id, tasks, getPendingTasks, getCompletedTasks, getExpiredTasks, getTasksByUserId]); // Added tasks here too, so it refilters if the base task list changes
 
   const getThemeColor = () => {
     switch (theme) {
-      case 'green':
-        return 'cyber-green';
-      case 'red':
-        return 'cyber-red';
-      case 'purple':
-        return 'cyber-purple';
-      default:
-        return 'cyber-blue';
+      case 'green': return 'cyber-green';
+      case 'red': return 'cyber-red';
+      case 'purple': return 'cyber-purple';
+      default: return 'cyber-blue';
     }
   };
-
   const themeColor = getThemeColor();
 
   const handleEditTask = (task: Task) => {
@@ -59,6 +73,7 @@ const TasksPage = () => {
   const handleCloseForm = () => {
     setShowAddTask(false);
     setEditingTask(null);
+    // No need to manually refresh here, the useEffect will refilter when `tasks` state changes in the store
   };
 
   return (
@@ -139,7 +154,7 @@ const TasksPage = () => {
         {/* Tasks list */}
         {filteredTasks.length === 0 ? (
           <div className="flex h-48 flex-col items-center justify-center border border-dashed border-gray-700 p-6 text-center">
-            <p className="text-gray-400">No tasks found</p>
+            <p className="text-gray-400">No tasks found for this filter</p>
             {filter !== 'all' && (
               <button
                 onClick={() => setFilter('all')}

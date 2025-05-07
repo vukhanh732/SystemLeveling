@@ -1,26 +1,30 @@
 import { useState, useEffect } from 'react';
-import { useTaskStore, useThemeStore } from '../store';
+// Import useAuthStore
+import { useTaskStore, useThemeStore, useAuthStore } from '../store';
 import { FaTrophy, FaCalendarAlt } from 'react-icons/fa';
 import Layout from '../components/Layout';
 import TaskCard from '../components/TaskCard';
 import type { Task } from '../types';
 
-// Group tasks by date
+// Group tasks by date (assuming this function is correct)
 const groupTasksByDate = (tasks: Task[]) => {
   const grouped: Record<string, Task[]> = {};
 
   tasks.forEach(task => {
-    const date = new Date(task.deadline).toLocaleDateString([], {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric'
-    });
-
-    if (!grouped[date]) {
-      grouped[date] = [];
+    // Handle potential invalid dates gracefully
+    try {
+        const date = new Date(task.deadline).toLocaleDateString([], {
+          year: 'numeric',
+          month: 'short',
+          day: 'numeric'
+        });
+        if (!grouped[date]) {
+          grouped[date] = [];
+        }
+        grouped[date].push(task);
+    } catch (e) {
+        console.error("Error parsing date for grouping:", task.deadline, e);
     }
-
-    grouped[date].push(task);
   });
 
   // Sort dates in reverse order (newest first)
@@ -28,12 +32,16 @@ const groupTasksByDate = (tasks: Task[]) => {
     .sort((a, b) => {
       const dateA = new Date(a[0]).getTime();
       const dateB = new Date(b[0]).getTime();
+      // Handle potential NaN from invalid dates during sort
+      if (isNaN(dateA) || isNaN(dateB)) return 0;
       return dateB - dateA;
     })
     .map(([date, tasks]) => ({ date, tasks }));
 };
 
 const HistoryPage = () => {
+  // Get user from auth store
+  const { user } = useAuthStore();
   const { getCompletedTasks } = useTaskStore();
   const { theme } = useThemeStore();
   const [completedTasks, setCompletedTasks] = useState<Task[]>([]);
@@ -41,29 +49,36 @@ const HistoryPage = () => {
   const [totalXpEarned, setTotalXpEarned] = useState(0);
 
   useEffect(() => {
-    const tasks = getCompletedTasks();
-    setCompletedTasks(tasks);
+    // Only fetch tasks if the user object and user.id exist
+    if (user?.id) {
+      console.log("HistoryPage: Fetching completed tasks for user:", user.id);
+      // --- FIX: Pass user.id to the selector ---
+      const tasks = getCompletedTasks(user.id);
+      setCompletedTasks(tasks);
 
-    // Group tasks by date
-    setGroupedTasks(groupTasksByDate(tasks));
+      // Group tasks by date
+      setGroupedTasks(groupTasksByDate(tasks));
 
-    // Calculate total XP earned
-    setTotalXpEarned(tasks.reduce((sum, task) => sum + task.xpReward, 0));
-  }, [getCompletedTasks]);
+      // Calculate total XP earned
+      setTotalXpEarned(tasks.reduce((sum, task) => sum + task.xpReward, 0));
+    } else {
+        // Clear tasks if user logs out
+        setCompletedTasks([]);
+        setGroupedTasks([]);
+        setTotalXpEarned(0);
+        console.log("HistoryPage: No user logged in, clearing tasks.");
+    }
+    // Add user?.id to dependency array to refetch when user changes
+  }, [user?.id, getCompletedTasks]);
 
   const getThemeColor = () => {
     switch (theme) {
-      case 'green':
-        return 'cyber-green';
-      case 'red':
-        return 'cyber-red';
-      case 'purple':
-        return 'cyber-purple';
-      default:
-        return 'cyber-blue';
+      case 'green': return 'cyber-green';
+      case 'red': return 'cyber-red';
+      case 'purple': return 'cyber-purple';
+      default: return 'cyber-blue';
     }
   };
-
   const themeColor = getThemeColor();
 
   return (
@@ -106,6 +121,7 @@ const HistoryPage = () => {
 
                 <div className="space-y-4">
                   {tasks.map(task => (
+                    // Pass onEdit={undefined} or remove if TaskCard handles it being optional
                     <TaskCard key={task.id} task={task} />
                   ))}
                 </div>
